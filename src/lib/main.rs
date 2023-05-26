@@ -1,16 +1,23 @@
+use crate::lib::ThreadPool;
 use std::fs;
+use std::thread;
 use std::net::TcpListener;
 use std::net::TcpStream;
 use std::io::prelude::*;
+use std::time::Duration;
 
 fn main() {
     let listerner = 
         TcpListener::bind("127.0.0.1:7878").unwrap();
 
+    let pool = ThreadPool::new(4);
+
     for stream in listerner.incoming() {
         let stream = stream.unwrap();
 
-        handle_connection(stream);
+        pool.execute(|| {
+            handle_connection(stream);
+        });
     }
 }
 
@@ -20,9 +27,13 @@ fn handle_connection(mut stream: TcpStream) {
     stream.read(&mut buffer).unwrap();
 
     let get = b"GET / HTTP/1.1\r\n";
+    let sleep = b"GET / sleep/1.1\r\n";
 
     let (status_line, filename ) =
         if buffer.starts_with(get){
+            ("HTTP/1.1 200 OK", "index.html")
+        } else if buffer.starts_with(sleep){
+            thread::sleep(Duration::from_secs(5));
             ("HTTP/1.1 200 OK", "index.html")
         } else {
             ("HTTP/1.1 404 NOT FOUND", "404.html")
